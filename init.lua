@@ -4,8 +4,7 @@
 local M = {}
 
 M.current_buf = nil
-M.notes_location = ""
-local notes_win = nil
+M.notes_location = "/var/tmp/"
 
 function M.open_notes()
     local curr_win = vim.api.nvim_get_current_win()
@@ -24,30 +23,23 @@ function M.open_notes()
     }
     config.col = curr_size.width / 2 - config.width / 2
     config.row = curr_size.height / 2 - config.height / 2
-    notes_win = vim.api.nvim_open_win(M.current_buf, true, config)
+    _ = vim.api.nvim_open_win(M.current_buf, true, config)
 end
 
 ---saves notes file lol
 ---@param lines string[]
 ---@param filename string
 local function save_file(lines, filename)
-    if M.notes_location == "" or M.notes_location == " " then
-        M.notes_location = nil
-    else
-        if M.notes_location[#M.notes_location] ~= "/" then
-            M.notes_location = M.notes_location .. "/"
-        end
-    end
-    local dir = M.notes_location or "/tmp/"
-    local file, err = io.open(dir .. filename, "w")
+    local file, err = io.open(M.notes_location .. filename, "w")
     if not file then
         print("\n" .. err)
         return
     end
     for _, line in ipairs(lines) do
-        file:write(line)
+        file:write(line .. "\n")
     end
     file:close()
+    vim.api.nvim_buf_delete(M.current_buf, {force = true})
     M.current_buf = nil
 end
 
@@ -69,6 +61,31 @@ function M.save_notes()
             save_file(lines, filename)
         end
     end
+end
+
+--- it supposed to return a list of files in a directory
+---@param dir string
+---@return string[]
+local function list_files_in_directory(dir)
+    local files = {}
+    local pfile = io.popen('ls ' .. dir, 'r')
+    if pfile then
+        for filename in pfile:lines() do
+            table.insert(files, filename)
+        end
+        pfile:close()
+    end
+    return files
+end
+
+function M.list_notes()
+    local list = list_files_in_directory(M.notes_location)
+
+    vim.ui.select(list, {}, function(choice)
+        if choice then
+            vim.cmd("edit " .. M.notes_location .. choice)
+        end
+    end)
 end
 
 return M
